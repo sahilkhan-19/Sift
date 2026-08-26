@@ -16,18 +16,15 @@ import sys
 # CONFIG
 # ============================================================
 
-PYTORCH_CPU_INDEX = (
-    "https://download.pytorch.org/whl/cpu"
-)
+PYTORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 
-PYTORCH_CUDA_INDEX = (
-    "https://download.pytorch.org/whl/cu130"
-)
+PYTORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu130"
 
 
 # ============================================================
 # NVIDIA GPU
 # ============================================================
+
 
 def check_nvidia_gpu():
     try:
@@ -45,13 +42,8 @@ def check_nvidia_gpu():
         cuda_version = None
 
         for line in result.stdout.splitlines():
-
             if "CUDA Version" in line:
-
-                cuda_version = (
-                    line.split("CUDA Version:")[-1]
-                    .strip()
-                )
+                cuda_version = line.split("CUDA Version:")[-1].strip()
 
                 break
 
@@ -68,6 +60,7 @@ def check_nvidia_gpu():
 # ============================================================
 # CHECK PYTORCH
 # ============================================================
+
 
 def check_pytorch():
 
@@ -89,7 +82,6 @@ print(torch.cuda.is_available())
     )
 
     if result.returncode != 0:
-
         return {
             "installed": False,
             "version": None,
@@ -100,7 +92,6 @@ print(torch.cuda.is_available())
     lines = result.stdout.strip().splitlines()
 
     if len(lines) < 3:
-
         return {
             "installed": False,
             "version": None,
@@ -119,6 +110,7 @@ print(torch.cuda.is_available())
 # ============================================================
 # INSTALL PYTORCH
 # ============================================================
+
 
 def install_pytorch(index_url):
 
@@ -139,7 +131,6 @@ def install_pytorch(index_url):
     )
 
     if result.returncode != 0:
-
         print("\n❌ Failed to install PyTorch.")
 
         sys.exit(1)
@@ -148,6 +139,7 @@ def install_pytorch(index_url):
 # ============================================================
 # RESTART SIFT
 # ============================================================
+
 
 def restart_sift():
     print("\n🔄 Restarting Sift with the new PyTorch environment...\n")
@@ -159,6 +151,7 @@ def restart_sift():
 # START SIFT
 # ============================================================
 
+
 def start_sift():
 
     import torch
@@ -167,30 +160,17 @@ def start_sift():
     # Verify PyTorch
     # --------------------------------------------------------
 
-    print(
-        f"PyTorch: {torch.__version__}"
-    )
+    print(f"PyTorch: {torch.__version__}")
 
     if torch.cuda.is_available():
+        print(f"🚀 Using GPU: {torch.cuda.get_device_name(0)}")
 
-        print(
-            f"🚀 Using GPU: "
-            f"{torch.cuda.get_device_name(0)}"
-        )
-
-        print(
-            f"CUDA: {torch.version.cuda}"
-        )
+        print(f"CUDA: {torch.version.cuda}")
 
     else:
+        print("\n💻 Using CPU")
 
-        print(
-            "\n💻 Using CPU"
-        )
-
-    print(
-        "\n🚀 Starting Sift..."
-    )
+    print("\n🚀 Starting Sift...")
 
     # --------------------------------------------------------
     # Run main.py
@@ -211,6 +191,7 @@ def start_sift():
 # MAIN LAUNCHER
 # ============================================================
 
+
 def main():
 
     # ========================================================
@@ -218,7 +199,6 @@ def main():
     # ========================================================
 
     if "--start" in sys.argv:
-
         start_sift()
 
         return
@@ -230,31 +210,17 @@ def main():
     has_gpu, driver_cuda = check_nvidia_gpu()
 
     if has_gpu:
-
-        print(
-            "\n🚀 NVIDIA GPU detected!"
-        )
+        print("\n🚀 NVIDIA GPU detected!")
 
         if driver_cuda:
-
-            print(
-                f"Driver CUDA support: "
-                f"{driver_cuda}"
-            )
+            print(f"Driver CUDA support: {driver_cuda}")
 
     else:
+        print("\n💻 No NVIDIA GPU detected.")
 
-        print(
-            "\n💻 No NVIDIA GPU detected."
-        )
+        print("Sift will use CPU.")
 
-        print(
-            "Sift will use CPU."
-        )
-
-        install_pytorch(
-            PYTORCH_CPU_INDEX
-        )
+        install_pytorch(PYTORCH_CPU_INDEX)
 
         restart_sift()
 
@@ -267,24 +233,16 @@ def main():
     pytorch = check_pytorch()
 
     if pytorch["installed"]:
+        print("\nCurrent PyTorch:")
 
-        print(
-            "\nCurrent PyTorch:"
-        )
-
-        print(
-            f"    {pytorch['version']}"
-        )
+        print(f"    {pytorch['version']}")
 
     # ========================================================
     # ALREADY CUDA
     # ========================================================
 
     if pytorch["available"]:
-
-        print(
-            "\n🚀 CUDA-enabled PyTorch is already active."
-        )
+        print("\n🚀 CUDA-enabled PyTorch is already active.")
 
         restart_sift()
 
@@ -294,41 +252,25 @@ def main():
     # GPU EXISTS BUT PYTORCH IS CPU
     # ========================================================
 
-    print(
-        "\nCUDA-enabled PyTorch is not currently active."
-    )
+    print("\nCUDA-enabled PyTorch is not currently active.")
 
     while True:
+        print("\nHow do you want Sift to run?")
 
-        print(
-            "\nHow do you want Sift to run?"
-        )
+        print("\n[1] CPU")
 
-        print(
-            "\n[1] CPU"
-        )
+        print("[2] GPU")
 
-        print(
-            "[2] GPU"
-        )
-
-        choice = input(
-            "\nChoose: "
-        ).strip()
+        choice = input("\nChoose: ").strip()
 
         # ----------------------------------------------------
         # CPU
         # ----------------------------------------------------
 
         if choice == "1":
+            print("\n⚙️ Starting Sift with CPU...")
 
-            print(
-                "\n⚙️ Starting Sift with CPU..."
-            )
-
-            install_pytorch(
-                PYTORCH_CPU_INDEX
-            )
+            install_pytorch(PYTORCH_CPU_INDEX)
 
             restart_sift()
 
@@ -339,22 +281,15 @@ def main():
         # ----------------------------------------------------
 
         if choice == "2":
+            print("\n⚙️ Starting Sift with GPU...")
 
-            print(
-                "\n⚙️ Starting Sift with GPU..."
-            )
-
-            install_pytorch(
-                PYTORCH_CUDA_INDEX
-            )
+            install_pytorch(PYTORCH_CUDA_INDEX)
 
             restart_sift()
 
             return
 
-        print(
-            "\n❌ Invalid choice."
-        )
+        print("\n❌ Invalid choice.")
 
 
 # ============================================================
