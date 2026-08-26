@@ -1,0 +1,51 @@
+[project]
+name = "sift"
+version = "0.1.0"
+description = "Sift - RAG-powered knowledge retrieval system"
+readme = "README.md"
+authors = [
+    { name = "sahil", email = "sahilkhan19info@gmail.com" }
+]
+requires-python = ">=3.12,<3.14"
+
+dependencies = [
+    "langchain-huggingface>=1.2.2",
+    "langchain-qdrant>=1.1.0",
+    "langchain-text-splitters>=1.1.2",
+    "pymupdf>=1.28.2",
+    "qdrant-client>=1.19.0",
+    "sentence-transformers>=6.0.0",
+    "torch",
+    "torchvision",
+]
+
+[project.scripts]
+sift = "sift:main"
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
+
+
+# ============================================================
+# PyTorch indexes
+# ============================================================
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+
+# ============================================================
+# Default: CPU
+# ============================================================
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
