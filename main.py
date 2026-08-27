@@ -7,7 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import TypedDict, List, Optional
+from typing import TypedDict
 
 import ollama
 import pymupdf
@@ -17,7 +17,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 
 # ============================================================
 # CONFIG
@@ -53,12 +53,12 @@ class SiftState(TypedDict):
     embedding_model: str
     embeddings: object
     total_pages: int
-    batch_size: Optional[int]
+    batch_size: int | None
     vector_store: object
     llm_model: str
     query: str
-    results: Optional[List[Document]]
-    answer: Optional[str]
+    results: list[Document] | None
+    answer: str | None
 
 
 # ============================================================
@@ -451,7 +451,7 @@ def cleanup_node(state: SiftState) -> SiftState:
     if vector_store is not None:
         try:
             vector_store.client.close()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     # --------------------------------------------------------
