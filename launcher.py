@@ -8,7 +8,6 @@ Responsible for:
     4. Restarting Sift with the correct environment
 """
 
-import os
 import subprocess
 import sys
 
@@ -141,9 +140,12 @@ def install_pytorch(index_url):
 # ============================================================
 
 
-def restart_sift():
+def restart_sift(device):
     print("\n🔄 Restarting Sift with the new PyTorch environment...\n")
-    result = subprocess.run([sys.executable, "main.py"], check=False)
+    result = subprocess.run(
+        [sys.executable, "main.py", "--device", device],
+        check=False,
+    )
     sys.exit(result.returncode)
 
 
@@ -222,7 +224,7 @@ def main():
 
         install_pytorch(PYTORCH_CPU_INDEX)
 
-        restart_sift()
+        restart_sift("cpu")
 
         return
 
@@ -244,7 +246,7 @@ def main():
     if pytorch["available"]:
         print("\n🚀 CUDA-enabled PyTorch is already active.")
 
-        restart_sift()
+        restart_sift("cuda")
 
         return
 
@@ -272,7 +274,7 @@ def main():
 
             install_pytorch(PYTORCH_CPU_INDEX)
 
-            restart_sift()
+            restart_sift("cpu")
 
             return
 
@@ -285,7 +287,7 @@ def main():
 
             install_pytorch(PYTORCH_CUDA_INDEX)
 
-            restart_sift()
+            restart_sift("cuda")
 
             return
 
