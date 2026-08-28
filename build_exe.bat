@@ -23,10 +23,10 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo [[ BUILD  ]]  Done!
-echo [[ BUILD  ]]  Sift.exe is in: dist\Sift.exe
+echo [[ BUILD  ]]  Copying dist\Sift.exe to project root...
+copy /Y dist\Sift.exe .
+
 echo.
-echo    Copy dist\Sift.exe into the Sift project folder
-echo    (next to launcher.py, main.py, etc.) and double-click to run.
+echo [[ BUILD  ]]  Done! Sift.exe is ready in the project root folder.
 echo.
 pause

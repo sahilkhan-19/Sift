@@ -28,7 +28,9 @@ dist/
 .eggs/
 *.egg
 *.spec
+!Sift.spec
 *.exe
+!Sift.exe
 *.dll
 *.dylib
 
