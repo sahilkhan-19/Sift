@@ -20,7 +20,7 @@ QDRANT_PATH = "./qdrant_db"
 
 COLLECTION_NAME = "sift"
 
-TOP_K = 3
+TOP_K = 4
 
 EXIT_WORDS = {"exit", "bye", "close"}
 
