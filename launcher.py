@@ -1,69 +1,64 @@
-"""
-Sift Launcher
-
-Responsible for:
-    1. Detecting NVIDIA GPU
-    2. Choosing CPU/GPU
-    3. Installing the correct PyTorch build (silently, with a spinner)
-    4. Restarting Sift with the correct environment
-"""
-
 import subprocess
 import sys
 import threading
 import time
 
-# ============================================================
-# CONFIG
-# ============================================================
-
 PYTORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 
 PYTORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu130"
 
-# ============================================================
-# ANSI — used here before Rich/main.py loads
-# ============================================================
-
-_G = "\033[92m"   # bright green
-_D = "\033[90m"   # dim grey
-_R = "\033[0m"    # reset
-_B = "\033[1m"    # bold
+_G = "\033[92m"
+_D = "\033[90m"
+_R = "\033[0m"
+_B = "\033[1m"
 
 _TAG_W = 7
+
 
 def _print(tag: str, msg: str) -> None:
     sys.stdout.write(f"{_G}[[{tag:^{_TAG_W}}]]{_R}  {msg}\n")
     sys.stdout.flush()
 
-def _ok(msg: str)     -> None: _print("OK",     msg)
-def _warn(msg: str)   -> None: _print("WARN",   msg)
-def _error(msg: str)  -> None: _print("ERROR",  msg)
-def _setup(msg: str)  -> None: _print("SETUP",  msg)
-def _gpu(msg: str)    -> None: _print("GPU",    msg)
-def _cpu(msg: str)    -> None: _print("CPU",    msg)
+
+def _ok(msg: str) -> None:
+    _print("OK", msg)
+
+
+def _warn(msg: str) -> None:
+    _print("WARN", msg)
+
+
+def _error(msg: str) -> None:
+    _print("ERROR", msg)
+
+
+def _setup(msg: str) -> None:
+    _print("SETUP", msg)
+
+
+def _gpu(msg: str) -> None:
+    _print("GPU", msg)
+
+
+def _cpu(msg: str) -> None:
+    _print("CPU", msg)
+
 
 _SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
 
 def _spin(label: str, thread: threading.Thread) -> None:
     """Show a spinner in-place while `thread` is alive."""
     i = 0
     while thread.is_alive():
         frame = _SPINNER[i % len(_SPINNER)]
-        sys.stdout.write(
-            f"\r{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  {frame}  {label}..."
-        )
+        sys.stdout.write(f"\r{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  {frame}  {label}...")
         sys.stdout.flush()
         time.sleep(0.07)
         i += 1
     # clear the spinner line
     sys.stdout.write(f"\r{' ' * 60}\r")
     sys.stdout.flush()
-
-
-# ============================================================
-# NVIDIA GPU
-# ============================================================
 
 
 def check_nvidia_gpu():
@@ -95,11 +90,6 @@ def check_nvidia_gpu():
         OSError,
     ):
         return False, None
-
-
-# ============================================================
-# CHECK PYTORCH
-# ============================================================
 
 
 def check_pytorch():
@@ -147,11 +137,6 @@ print(torch.cuda.is_available())
     }
 
 
-# ============================================================
-# INSTALL PYTORCH  (silent — all uv output suppressed)
-# ============================================================
-
-
 def install_pytorch(index_url):
 
     result_holder = [None]
@@ -168,7 +153,7 @@ def install_pytorch(index_url):
                 index_url,
                 "--reinstall",
             ],
-            capture_output=True,   # ← suppresses all uv verbose output
+            capture_output=True,
             check=False,
         )
 
@@ -186,11 +171,6 @@ def install_pytorch(index_url):
     _ok("Environment ready.")
 
 
-# ============================================================
-# RESTART SIFT
-# ============================================================
-
-
 def restart_sift(device):
     _setup(f"Restarting Sift  [{device.upper()}]")
     result = subprocess.run(
@@ -198,11 +178,6 @@ def restart_sift(device):
         check=False,
     )
     sys.exit(result.returncode)
-
-
-# ============================================================
-# START SIFT
-# ============================================================
 
 
 def start_sift():
@@ -225,30 +200,21 @@ def start_sift():
     sys.exit(result.returncode)
 
 
-# ============================================================
-# MAIN LAUNCHER
-# ============================================================
-
-
 def main():
-
-    # ========================================================
-    # AFTER RESTART
-    # ========================================================
 
     if "--start" in sys.argv:
         start_sift()
 
         return
 
-    # ========================================================
-    # GPU DETECTION
-    # ========================================================
-
     has_gpu, driver_cuda = check_nvidia_gpu()
 
     if has_gpu:
-        label = f"NVIDIA GPU detected  [CUDA {driver_cuda}]" if driver_cuda else "NVIDIA GPU detected"
+        label = (
+            f"NVIDIA GPU detected  [CUDA {driver_cuda}]"
+            if driver_cuda
+            else "NVIDIA GPU detected"
+        )
         _gpu(label)
 
     else:
@@ -260,18 +226,10 @@ def main():
 
         return
 
-    # ========================================================
-    # CHECK CURRENT PYTORCH
-    # ========================================================
-
     pytorch = check_pytorch()
 
     if pytorch["installed"]:
         _setup(f"PyTorch {pytorch['version']}")
-
-    # ========================================================
-    # ALREADY CUDA
-    # ========================================================
 
     if pytorch["available"]:
         _ok("CUDA-enabled PyTorch active.")
@@ -280,23 +238,16 @@ def main():
 
         return
 
-    # ========================================================
-    # GPU EXISTS BUT PYTORCH IS CPU-ONLY
-    # ========================================================
-
     _warn("CUDA PyTorch not active.")
 
     while True:
-        sys.stdout.write(f"\n{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  Run Sift on  [1] CPU  [2] GPU : {_G}")
+        sys.stdout.write(
+            f"\n{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  Run Sift on  [1] CPU  [2] GPU : {_G}"
+        )
         sys.stdout.flush()
         choice = input().strip()
-        sys.stdout.write(f"\033[0m")
+        sys.stdout.write("\033[0m")
         sys.stdout.flush()
-
-        # ----------------------------------------------------
-        # CPU
-        # ----------------------------------------------------
-
         if choice == "1":
             _setup("Starting with CPU...")
 
@@ -305,11 +256,6 @@ def main():
             restart_sift("cpu")
 
             return
-
-        # ----------------------------------------------------
-        # GPU
-        # ----------------------------------------------------
-
         if choice == "2":
             _setup("Starting with GPU...")
 
@@ -321,10 +267,6 @@ def main():
 
         _error("Invalid choice — enter 1 or 2.")
 
-
-# ============================================================
-# ENTRY
-# ============================================================
 
 if __name__ == "__main__":
     main()

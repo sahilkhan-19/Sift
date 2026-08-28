@@ -1,10 +1,3 @@
-"""
-Sift UI
-Centralized terminal styling — colors, status prefixes, panels, prompts,
-and progress bars. Every print()/input() in main.py goes through here so
-the visual style lives in one place.
-"""
-
 import os
 import sys
 
@@ -19,25 +12,21 @@ from rich.progress import (
 from rich.prompt import Confirm
 from rich.theme import Theme
 
-# ============================================================
-# THEME
-# ============================================================
-
 _theme = Theme(
     {
-        "brand":  "bold color(82)",
-        "dim":    "color(238)",
+        "brand": "bold color(82)",
+        "dim": "color(238)",
         "system": "bold green",
-        "gpu":    "bold green",
-        "index":  "green",
-        "embed":  "green",
+        "gpu": "bold green",
+        "index": "green",
+        "embed": "green",
         "vector": "green",
-        "store":  "green",
-        "info":   "cyan",
-        "ok":     "bold green",
-        "warn":   "bold yellow",
-        "error":  "bold red",
-        "user":   "bold green",
+        "store": "green",
+        "info": "cyan",
+        "ok": "bold green",
+        "warn": "bold yellow",
+        "error": "bold red",
+        "user": "bold green",
         "prompt": "bold green",
     }
 )
@@ -48,46 +37,78 @@ console = Console(
     highlight=False,
 )
 
-_TAG_WIDTH = 7  # keeps every "[[ TAG ]]" prefix the same width
-
-# ANSI escape codes for green typed input
-_GREEN  = "\033[97m"   # bright white — user typed text
-_RESET  = "\033[0m"    # back to terminal default
+_TAG_WIDTH = 7
+_GREEN = "\033[97m"
+_RESET = "\033[0m"
 
 
 def _line(tag: str, style: str, message: str) -> None:
     console.print(f"[{style}][[{tag:^{_TAG_WIDTH}}]][/{style}]  {message}")
 
 
-# --------------------------------------------------------------
-# Status lines  (signatures unchanged)
-# --------------------------------------------------------------
-
-def system(msg: str) -> None: _line("SYSTEM", "system", msg)
-def gpu(msg: str)    -> None: _line("GPU",    "gpu",    msg)
-def cpu(msg: str)    -> None: _line("CPU",    "gpu",    msg)
-def cuda(msg: str)   -> None: _line("CUDA",   "gpu",    msg)
-def pdf(msg: str)    -> None: _line("PDF",    "index",  msg)
-def pages(msg: str)  -> None: _line("PAGES",  "index",  msg)
-def index(msg: str)  -> None: _line("INDEX",  "index",  msg)
-def embed(msg: str)  -> None: _line("EMBED",  "embed",  msg)
-def vector(msg: str) -> None: _line("VECTOR", "vector", msg)
-def store(msg: str)  -> None: _line("STORE",  "store",  msg)
-def llm(msg: str)    -> None: _line("LLM",    "brand",  msg)
-def info(msg: str)   -> None: _line("INFO",   "info",   msg)
-def ok(msg: str)     -> None: _line("OK",     "ok",     msg)
-def warn(msg: str)   -> None: _line("WARN",   "warn",   msg)
-def error(msg: str)  -> None: _line("ERROR",  "error",  msg)
+def system(msg: str) -> None:
+    _line("SYSTEM", "system", msg)
 
 
-# --------------------------------------------------------------
-# Banner
-# --------------------------------------------------------------
+def gpu(msg: str) -> None:
+    _line("GPU", "gpu", msg)
 
-_SEP_W  = 87
-_SEP    = "-" * _SEP_W
 
-# SIFT logo lines (28 chars wide) — padded to center within 87-char separator
+def cpu(msg: str) -> None:
+    _line("CPU", "gpu", msg)
+
+
+def cuda(msg: str) -> None:
+    _line("CUDA", "gpu", msg)
+
+
+def pdf(msg: str) -> None:
+    _line("PDF", "index", msg)
+
+
+def pages(msg: str) -> None:
+    _line("PAGES", "index", msg)
+
+
+def index(msg: str) -> None:
+    _line("INDEX", "index", msg)
+
+
+def embed(msg: str) -> None:
+    _line("EMBED", "embed", msg)
+
+
+def vector(msg: str) -> None:
+    _line("VECTOR", "vector", msg)
+
+
+def store(msg: str) -> None:
+    _line("STORE", "store", msg)
+
+
+def llm(msg: str) -> None:
+    _line("LLM", "brand", msg)
+
+
+def info(msg: str) -> None:
+    _line("INFO", "info", msg)
+
+
+def ok(msg: str) -> None:
+    _line("OK", "ok", msg)
+
+
+def warn(msg: str) -> None:
+    _line("WARN", "warn", msg)
+
+
+def error(msg: str) -> None:
+    _line("ERROR", "error", msg)
+
+
+_SEP_W = 87
+_SEP = "-" * _SEP_W
+
 _LOGO_LINES = [
     "███████╗██╗███████╗████████╗",
     "██╔════╝██║██╔════╝╚══██╔══╝",
@@ -96,9 +117,8 @@ _LOGO_LINES = [
     "███████║██║██║        ██║   ",
     "╚══════╝╚═╝╚═╝        ╚═╝   ",
 ]
-_LOGO_PAD = " " * ((_SEP_W - 28) // 2)   # 29 spaces — centers 28-char logo
+_LOGO_PAD = " " * ((_SEP_W - 28) // 2)
 
-# BYE! art lines (29 chars wide) — padded to center within 87-char separator
 _GOODBYE_LINES = [
     "██████╗ ██╗   ██╗███████╗██╗",
     "██╔══██╗╚██╗ ██╔╝██╔════╝██║",
@@ -107,7 +127,7 @@ _GOODBYE_LINES = [
     "██████╔╝   ██║   ███████╗██╗",
     "╚═════╝    ╚═╝   ╚══════╝╚═╝",
 ]
-_GOODBYE_PAD = " " * ((_SEP_W - 29) // 2)  # 29 spaces — centers 29-char BYE!
+_GOODBYE_PAD = " " * ((_SEP_W - 29) // 2)
 
 
 def banner() -> None:
@@ -128,18 +148,13 @@ def goodbye() -> None:
     for line in _GOODBYE_LINES:
         console.print(f"[brand]{_GOODBYE_PAD}{line}[/brand]")
     console.print()
-    console.print(f"[dim]{'alr, I\'m outta here.':^{_SEP_W}}[/dim]")
+    console.print(f"[dim]{"alr, I'm outta here.":^{_SEP_W}}[/dim]")
     console.print()
     console.print(f"[brand]{_SEP}[/brand]")
     console.print()
 
 
-# --------------------------------------------------------------
-# Prompts  (signatures unchanged)
-# --------------------------------------------------------------
-
 def confirm(question: str, default: bool = True) -> bool:
-    # Print the prompt in green, then ask
     console.print(f"[brand]>[/brand] [prompt]{question}[/prompt] ", end="")
     sys.stdout.write(_GREEN)
     sys.stdout.flush()
@@ -185,10 +200,6 @@ def answer_panel(text: str) -> None:
     console.print(f"[brand]{_SEP}[/brand]\n")
 
 
-# --------------------------------------------------------------
-# Progress bar  (signature unchanged)
-# --------------------------------------------------------------
-
 def progress_bar(label: str = "INDEX") -> Progress:
     return Progress(
         TextColumn(f"[embed][[{label:^{_TAG_WIDTH}}]][/embed]"),
@@ -204,10 +215,6 @@ def progress_bar(label: str = "INDEX") -> Progress:
         console=console,
     )
 
-
-# --------------------------------------------------------------
-# Spinner  (signature unchanged)
-# --------------------------------------------------------------
 
 def spinner(message: str, tag: str = "VECTOR"):
     return console.status(

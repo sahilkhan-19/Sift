@@ -1,9 +1,3 @@
-"""
-Sift v1
-Flow: DEVICE -> LANGUAGE -> EMBEDDING MODEL -> INDEX -> SELECT LLM -> QUERY -> RETRIEVE -> GENERATE ANSWER
-Terminal output is centralized in ui.py — see that module for the styling.
-"""
-
 import os
 import shutil
 import subprocess
@@ -22,19 +16,14 @@ from langgraph.graph import END, START, StateGraph
 
 import ui
 
-# ============================================================
-# CONFIG
-# ============================================================
-
 QDRANT_PATH = "./qdrant_db"
 
 COLLECTION_NAME = "sift"
 
-TOP_K = 4
+TOP_K = 3
 
 EXIT_WORDS = {"exit", "bye", "close"}
 
-# tier -> (ollama model tag, label)
 LLM_OPTIONS = {
     "1": ("qwen2.5:7b", "Best Performance (too slower)"),
     "2": ("phi3.5", "Performance (slower)"),
@@ -42,10 +31,6 @@ LLM_OPTIONS = {
     "4": ("llama3.2:1b", "Quick (faster)"),
 }
 
-
-# ============================================================
-# STATE
-# ============================================================
 
 class SiftState(TypedDict):
     doc_path: str
@@ -61,10 +46,6 @@ class SiftState(TypedDict):
     results: list[Document] | None
     answer: str | None
 
-
-# ============================================================
-# PDF HELPERS
-# ============================================================
 
 def get_pdf_page_count(pdf_path):
     with pymupdf.open(pdf_path) as pdf:
@@ -88,10 +69,6 @@ def get_batch_size(total_pages):
     else:
         return 50
 
-
-# ============================================================
-# OLLAMA MODEL AVAILABILITY
-# ============================================================
 
 def _normalize_tag(name):
     # Ollama treats "llama3.2" and "llama3.2:latest" as the same model.
@@ -121,15 +98,7 @@ def ensure_model_available(model_name):
     ui.ok(f"{model_name} downloaded.")
 
 
-# ============================================================
-# NODE 1: DEVICE
-# ============================================================
-
 def detect_device_node(state: SiftState) -> SiftState:
-
-    # --------------------------------------------------------
-    # launcher.py already decided this — don't ask again
-    # --------------------------------------------------------
 
     if "--device" in sys.argv:
         device = sys.argv[sys.argv.index("--device") + 1]
@@ -137,10 +106,6 @@ def detect_device_node(state: SiftState) -> SiftState:
         (ui.gpu if device == "cuda" else ui.cpu)(f"Device set by launcher: {device}")
 
         return {**state, "device": device}
-
-    # --------------------------------------------------------
-    # Standalone run (no launcher) — detect and ask as before
-    # --------------------------------------------------------
 
     if torch.cuda.is_available():
         ui.gpu(f"NVIDIA GPU detected: {torch.cuda.get_device_name(0)}")
@@ -163,14 +128,12 @@ def detect_device_node(state: SiftState) -> SiftState:
     return {**state, "device": device}
 
 
-# ============================================================
-# NODE 2: LANGUAGE
-# ============================================================
-
 def ask_language_node(state: SiftState) -> SiftState:
 
     while True:
-        answer = ui.ask("Is your document entirely in English? (yes/no)").strip().lower()
+        answer = (
+            ui.ask("Is your document entirely in English? (yes/no)").strip().lower()
+        )
 
         if answer in ("yes", "no"):
             break
@@ -180,27 +143,15 @@ def ask_language_node(state: SiftState) -> SiftState:
     return {**state, "english": answer == "yes"}
 
 
-# ============================================================
-# NODE 3: EMBEDDING MODEL
-# ============================================================
-
 def choose_embeddings_node(state: SiftState) -> SiftState:
 
     device = state["device"]
     english = state["english"]
 
-    # --------------------------------------------------------
-    # Non-English → must use the multilingual model
-    # --------------------------------------------------------
-
     if not english:
         model_name = "BAAI/bge-m3"
 
         ui.embed("Non-English document -> using multilingual model BGE-M3")
-
-    # --------------------------------------------------------
-    # English → ask fast vs quality, regardless of device
-    # --------------------------------------------------------
 
     else:
         ui.menu("EMBEDDING PREFERENCE", {"1": "Faster", "2": "Better Quality"})
@@ -236,10 +187,6 @@ def choose_embeddings_node(state: SiftState) -> SiftState:
     return {**state, "embedding_model": model_name, "embeddings": embeddings}
 
 
-# ============================================================
-# NODE 4: INDEX
-# ============================================================
-
 def index_node(state: SiftState) -> SiftState:
 
     pdf_path = state["doc_path"]
@@ -252,10 +199,6 @@ def index_node(state: SiftState) -> SiftState:
 
     batch_size = get_batch_size(total_pages)
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-
-    # --------------------------------------------------------
-    # SMALL PDF → load entire doc at once
-    # --------------------------------------------------------
 
     if batch_size is None:
         ui.index("Strategy: load entire document")
@@ -273,10 +216,6 @@ def index_node(state: SiftState) -> SiftState:
         )
 
         ui.ok(f"Indexed {len(pages)} pages -> {len(chunks)} chunks")
-
-    # --------------------------------------------------------
-    # LARGE PDF → lazy load in batches, with a real progress bar
-    # --------------------------------------------------------
 
     else:
         ui.index(f"Strategy: lazy load, {batch_size} pages/batch")
@@ -314,10 +253,6 @@ def index_node(state: SiftState) -> SiftState:
 
             if page_batch:
                 chunks = splitter.split_documents(page_batch)
-
-                # vector_store is guaranteed to exist here — total_pages is
-                # always greater than batch_size, so at least one full
-                # batch already ran.
                 vector_store.add_documents(chunks)
 
                 processed_pages += len(page_batch)
@@ -336,10 +271,6 @@ def index_node(state: SiftState) -> SiftState:
         "batch_size": batch_size,
     }
 
-
-# ============================================================
-# NODE 5: SELECT LLM
-# ============================================================
 
 def select_llm_node(state: SiftState) -> SiftState:
 
@@ -365,10 +296,6 @@ def select_llm_node(state: SiftState) -> SiftState:
     return {**state, "llm_model": llm_model}
 
 
-# ============================================================
-# NODE 6: QUERY
-# ============================================================
-
 def ask_query_node(state: SiftState) -> SiftState:
     query = ui.ask("Enter your query (or type exit/bye/close to quit)")
     return {**state, "query": query}
@@ -378,10 +305,6 @@ def route_after_query(state: SiftState) -> str:
     return "cleanup" if state["query"].strip().lower() in EXIT_WORDS else "retrieve"
 
 
-# ============================================================
-# NODE 7: RETRIEVE
-# ============================================================
-
 def retrieve_node(state: SiftState) -> SiftState:
 
     with ui.spinner("Searching knowledge base...", tag="VECTOR"):
@@ -390,17 +313,7 @@ def retrieve_node(state: SiftState) -> SiftState:
     return {**state, "results": results}
 
 
-# ============================================================
-# NODE 8: GENERATE ANSWER
-# ============================================================
-
 def generate_answer_node(state: SiftState) -> SiftState:
-
-    # --------------------------------------------------------
-    # Force Ollama onto the same device chosen at the start.
-    # OLLAMA_NUM_GPU=0 → CPU only. Unset/high → let it use the GPU.
-    # --------------------------------------------------------
-
     if state["device"] == "cpu":
         os.environ["OLLAMA_NUM_GPU"] = "0"
     else:
@@ -429,31 +342,20 @@ def generate_answer_node(state: SiftState) -> SiftState:
     return {**state, "answer": response.content}
 
 
-# ============================================================
-# NODE 9: CLEANUP (runs on exit)
-# ============================================================
-
 def cleanup_node(state: SiftState) -> SiftState:
 
     ui.system("Shutting down Sift...")
-
-    # --------------------------------------------------------
-    # Unload the LLM immediately, instead of waiting for
-    # Ollama's default ~5 min idle timeout to free the GPU.
-    # --------------------------------------------------------
 
     llm_model = state.get("llm_model")
 
     if llm_model:
         try:
-            subprocess.run(["ollama", "stop", llm_model], check=False, capture_output=True)
+            subprocess.run(
+                ["ollama", "stop", llm_model], check=False, capture_output=True
+            )
             ui.ok(f"Unloaded {llm_model} from memory.")
         except FileNotFoundError:
             pass
-
-    # --------------------------------------------------------
-    # Release Qdrant's file lock before deleting the folder
-    # --------------------------------------------------------
 
     vector_store = state.get("vector_store")
 
@@ -462,11 +364,6 @@ def cleanup_node(state: SiftState) -> SiftState:
             vector_store.client.close()
         except Exception:  # noqa: BLE001, S110
             pass
-
-    # --------------------------------------------------------
-    # Wipe the collection so the next run starts fresh
-    # --------------------------------------------------------
-
     if os.path.exists(QDRANT_PATH):
         shutil.rmtree(QDRANT_PATH, ignore_errors=True)
 
@@ -476,10 +373,6 @@ def cleanup_node(state: SiftState) -> SiftState:
 
     return state
 
-
-# ============================================================
-# GRAPH
-# ============================================================
 
 graph_builder = StateGraph(SiftState)
 
@@ -511,18 +404,14 @@ graph_builder.add_edge("cleanup", END)
 graph = graph_builder.compile()
 
 
-# ============================================================
-# PDF FILE PICKER
-# ============================================================
-
 def pick_pdf() -> str | None:
     """Open a native Windows file dialog and return the chosen PDF path."""
     import tkinter as tk
     from tkinter import filedialog
 
     root = tk.Tk()
-    root.withdraw()          # hide the blank tkinter root window
-    root.attributes("-topmost", True)  # bring the dialog to front
+    root.withdraw()
+    root.attributes("-topmost", True)
 
     file_path = filedialog.askopenfilename(
         title="Select a PDF to index",
@@ -530,12 +419,8 @@ def pick_pdf() -> str | None:
     )
 
     root.destroy()
-    return file_path or None  # empty string on cancel → None
+    return file_path or None
 
-
-# ============================================================
-# ENTRY POINT
-# ============================================================
 
 if __name__ == "__main__":
     ui.banner()
