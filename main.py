@@ -1,6 +1,7 @@
 """
 Sift v1
 Flow: DEVICE -> LANGUAGE -> EMBEDDING MODEL -> INDEX -> SELECT LLM -> QUERY -> RETRIEVE -> GENERATE ANSWER
+Terminal output is centralized in ui.py — see that module for the styling.
 """
 
 import os
@@ -19,11 +20,11 @@ from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import END, START, StateGraph
 
+import ui
+
 # ============================================================
 # CONFIG
 # ============================================================
-
-DOC_PATH = "cosmos.pdf"
 
 QDRANT_PATH = "./qdrant_db"
 
@@ -103,16 +104,21 @@ def ensure_model_available(model_name):
     local_tags = {_normalize_tag(m.model) for m in ollama.list().models}
 
     if normalized in local_tags:
-        print(f"✅ {model_name} already available locally.")
+        ui.ok(f"{model_name} already available locally.")
         return
 
-    print(f"\n⬇️ {model_name} not found locally. Pulling now (this may take a while)...")
+    ui.warn(f"{model_name} not found locally. Pulling now (this may take a while)...")
+
+    last_status = ""
 
     for progress in ollama.pull(model_name, stream=True):
         status = progress.get("status", "")
-        print(f"\r{status:<80}", end="", flush=True)
 
-    print(f"\n✅ {model_name} downloaded.")
+        if status and status != last_status:
+            ui.info(status)
+            last_status = status
+
+    ui.ok(f"{model_name} downloaded.")
 
 
 # ============================================================
@@ -128,7 +134,7 @@ def detect_device_node(state: SiftState) -> SiftState:
     if "--device" in sys.argv:
         device = sys.argv[sys.argv.index("--device") + 1]
 
-        print(f"\n⚙️ Device set by launcher: {device}")
+        (ui.gpu if device == "cuda" else ui.cpu)(f"Device set by launcher: {device}")
 
         return {**state, "device": device}
 
@@ -137,20 +143,20 @@ def detect_device_node(state: SiftState) -> SiftState:
     # --------------------------------------------------------
 
     if torch.cuda.is_available():
-        print(f"\n🚀 GPU found: {torch.cuda.get_device_name(0)}")
+        ui.gpu(f"NVIDIA GPU detected: {torch.cuda.get_device_name(0)}")
 
         while True:
-            choice = input("Continue with GPU or CPU? (gpu/cpu): ").strip().lower()
+            choice = ui.ask("Continue with GPU or CPU? (gpu/cpu)").strip().lower()
 
             if choice in ("gpu", "cpu"):
                 break
 
-            print("Please enter gpu or cpu.")
+            ui.warn("Please enter gpu or cpu.")
 
         device = "cuda" if choice == "gpu" else "cpu"
 
     else:
-        print("\n💻 GPU not found. Continuing with CPU.")
+        ui.warn("GPU not found. Continuing with CPU.")
 
         device = "cpu"
 
@@ -164,12 +170,12 @@ def detect_device_node(state: SiftState) -> SiftState:
 def ask_language_node(state: SiftState) -> SiftState:
 
     while True:
-        answer = input("\nIs your document completely in English? (yes/no): ").strip().lower()
+        answer = ui.ask("Is your document entirely in English? (yes/no)").strip().lower()
 
         if answer in ("yes", "no"):
             break
 
-        print("Please enter yes or no.")
+        ui.warn("Please enter yes or no.")
 
     return {**state, "english": answer == "yes"}
 
@@ -190,38 +196,36 @@ def choose_embeddings_node(state: SiftState) -> SiftState:
     if not english:
         model_name = "BAAI/bge-m3"
 
-        print("\n🌍 Non-English doc → using BGE-M3")
+        ui.embed("Non-English document -> using multilingual model BGE-M3")
 
     # --------------------------------------------------------
     # English → ask fast vs quality, regardless of device
     # --------------------------------------------------------
 
     else:
-        while True:
-            print("\nChoose embedding preference:")
-            print("[1] Faster")
-            print("[2] Better Quality")
+        ui.menu("EMBEDDING PREFERENCE", {"1": "Faster", "2": "Better Quality"})
 
-            choice = input("Choose: ").strip()
+        while True:
+            choice = ui.ask("Choose").strip()
 
             if choice == "1":
                 model_name = "BAAI/bge-small-en-v1.5"
 
-                print("\n⚡ Using BGE-small-en-v1.5")
+                ui.embed("Selected: Faster (BGE-small-en-v1.5)")
 
                 break
 
             if choice == "2":
                 model_name = "BAAI/bge-m3"
 
-                print("\n🎯 Using BGE-M3")
+                ui.embed("Selected: Better Quality (BGE-M3)")
 
                 break
 
-            print("❌ Invalid choice. Please enter 1 or 2.")
+            ui.warn("Invalid choice. Please enter 1 or 2.")
 
-    print(f"\nEmbedding model: {model_name}")
-    print(f"Device: {device}")
+    ui.info(f"Embedding model: {model_name}")
+    ui.info(f"Device: {device}")
 
     embeddings = HuggingFaceEmbeddings(
         model_name=model_name,
@@ -243,8 +247,8 @@ def index_node(state: SiftState) -> SiftState:
 
     total_pages = get_pdf_page_count(pdf_path)
 
-    print(f"\n📄 PDF: {pdf_path}")
-    print(f"📑 Pages: {total_pages}")
+    ui.pdf(pdf_path)
+    ui.pages(f"{total_pages} pages")
 
     batch_size = get_batch_size(total_pages)
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -254,10 +258,12 @@ def index_node(state: SiftState) -> SiftState:
     # --------------------------------------------------------
 
     if batch_size is None:
-        print("\n📦 Strategy: Load entire PDF")
+        ui.index("Strategy: load entire document")
 
         pages = list(get_pdf_pages(pdf_path))
         chunks = splitter.split_documents(pages)
+
+        ui.vector("Storing vectors in Qdrant...")
 
         vector_store = QdrantVectorStore.from_documents(
             documents=chunks,
@@ -266,54 +272,62 @@ def index_node(state: SiftState) -> SiftState:
             collection_name=COLLECTION_NAME,
         )
 
-        print(f"Pages loaded: {len(pages)}")
-        print(f"Chunks created: {len(chunks)}")
+        ui.ok(f"Indexed {len(pages)} pages -> {len(chunks)} chunks")
 
     # --------------------------------------------------------
-    # LARGE PDF → lazy load in batches
+    # LARGE PDF → lazy load in batches, with a real progress bar
     # --------------------------------------------------------
 
     else:
-        print(f"\n📦 Strategy: Lazy load → {batch_size} pages/batch")
+        ui.index(f"Strategy: lazy load, {batch_size} pages/batch")
 
         vector_store = None
         page_batch = []
         processed_pages = 0
+        total_chunks = 0
 
-        for page in get_pdf_pages(pdf_path):
-            page_batch.append(page)
+        with ui.progress_bar() as progress:
+            task = progress.add_task("index", total=total_pages)
 
-            if len(page_batch) == batch_size:
+            for page in get_pdf_pages(pdf_path):
+                page_batch.append(page)
+
+                if len(page_batch) == batch_size:
+                    chunks = splitter.split_documents(page_batch)
+
+                    if vector_store is None:
+                        vector_store = QdrantVectorStore.from_documents(
+                            documents=chunks,
+                            embedding=embeddings,
+                            path=QDRANT_PATH,
+                            collection_name=COLLECTION_NAME,
+                        )
+                    else:
+                        vector_store.add_documents(chunks)
+
+                    processed_pages += len(page_batch)
+                    total_chunks += len(chunks)
+
+                    progress.update(task, completed=processed_pages)
+
+                    page_batch.clear()
+
+            if page_batch:
                 chunks = splitter.split_documents(page_batch)
 
-                if vector_store is None:
-                    vector_store = QdrantVectorStore.from_documents(
-                        documents=chunks,
-                        embedding=embeddings,
-                        path=QDRANT_PATH,
-                        collection_name=COLLECTION_NAME,
-                    )
-                else:
-                    vector_store.add_documents(chunks)
+                # vector_store is guaranteed to exist here — total_pages is
+                # always greater than batch_size, so at least one full
+                # batch already ran.
+                vector_store.add_documents(chunks)
 
                 processed_pages += len(page_batch)
+                total_chunks += len(chunks)
 
-                print(f"Processed {processed_pages}/{total_pages} pages → {len(chunks)} chunks")
+                progress.update(task, completed=processed_pages)
 
-                page_batch.clear()
+        ui.ok(f"Indexed {processed_pages} pages -> {total_chunks} chunks")
 
-        if page_batch:
-            chunks = splitter.split_documents(page_batch)
-
-            # vector_store is guaranteed to exist here — total_pages is always
-            # greater than batch_size, so at least one full batch already ran.
-            vector_store.add_documents(chunks)
-
-            processed_pages += len(page_batch)
-
-            print(f"Processed {processed_pages}/{total_pages} pages → {len(chunks)} chunks")
-
-    print("\n✅ Indexing complete!")
+    ui.ok("Indexing completed successfully.")
 
     return {
         **state,
@@ -329,22 +343,22 @@ def index_node(state: SiftState) -> SiftState:
 
 def select_llm_node(state: SiftState) -> SiftState:
 
-    print("\nSelect the LLM:")
-
-    for key, (model_name, label) in LLM_OPTIONS.items():
-        print(f"[{key}] {label} — {model_name}")
+    ui.menu(
+        "SELECT LLM",
+        {key: f"{label} — {model}" for key, (model, label) in LLM_OPTIONS.items()},
+    )
 
     while True:
-        choice = input("Choose: ").strip()
+        choice = ui.ask("Choose").strip()
 
         if choice in LLM_OPTIONS:
             break
 
-        print("❌ Invalid choice. Please enter 1, 2, 3, or 4.")
+        ui.warn("Invalid choice. Please enter 1, 2, 3, or 4.")
 
     llm_model, label = LLM_OPTIONS[choice]
 
-    print(f"\n✅ Selected: {label} ({llm_model})")
+    ui.llm(f"Selected: {label} ({llm_model})")
 
     ensure_model_available(llm_model)
 
@@ -356,7 +370,7 @@ def select_llm_node(state: SiftState) -> SiftState:
 # ============================================================
 
 def ask_query_node(state: SiftState) -> SiftState:
-    query = input("\n\nEnter your Query (or type exit/bye/close to quit): ")
+    query = ui.ask("Enter your query (or type exit/bye/close to quit)")
     return {**state, "query": query}
 
 
@@ -370,14 +384,8 @@ def route_after_query(state: SiftState) -> str:
 
 def retrieve_node(state: SiftState) -> SiftState:
 
-    results = state["vector_store"].similarity_search(query=state["query"], k=TOP_K)
-
-    print(f"\n🔎 Top {len(results)} results for: \"{state['query']}\"\n")
-
-    for i, doc in enumerate(results, start=1):
-        print(f"--- Result {i} (page {doc.metadata.get('page')}) ---")
-        print(doc.page_content[:300])
-        print()
+    with ui.spinner("Searching knowledge base...", tag="VECTOR"):
+        results = state["vector_store"].similarity_search(query=state["query"], k=TOP_K)
 
     return {**state, "results": results}
 
@@ -410,12 +418,13 @@ def generate_answer_node(state: SiftState) -> SiftState:
         f"Question: {state['query']}"
     )
 
-    llm = ChatOllama(model=state["llm_model"])
+    llm_client = ChatOllama(model=state["llm_model"])
 
-    response = llm.invoke(prompt)
+    ui.llm("Generating answer...")
 
-    print("\n💬 Answer:\n")
-    print(response.content)
+    response = llm_client.invoke(prompt)
+
+    ui.answer_panel(response.content)
 
     return {**state, "answer": response.content}
 
@@ -426,7 +435,7 @@ def generate_answer_node(state: SiftState) -> SiftState:
 
 def cleanup_node(state: SiftState) -> SiftState:
 
-    print("\n👋 Goodbye!")
+    ui.system("Shutting down Sift...")
 
     # --------------------------------------------------------
     # Unload the LLM immediately, instead of waiting for
@@ -438,7 +447,7 @@ def cleanup_node(state: SiftState) -> SiftState:
     if llm_model:
         try:
             subprocess.run(["ollama", "stop", llm_model], check=False, capture_output=True)
-            print(f"🧠 Unloaded {llm_model} from memory.")
+            ui.ok(f"Unloaded {llm_model} from memory.")
         except FileNotFoundError:
             pass
 
@@ -461,7 +470,9 @@ def cleanup_node(state: SiftState) -> SiftState:
     if os.path.exists(QDRANT_PATH):
         shutil.rmtree(QDRANT_PATH, ignore_errors=True)
 
-        print(f"🧹 Removed {QDRANT_PATH} — Sift will start fresh next time.")
+        ui.ok(f"Removed {QDRANT_PATH} — Sift will start fresh next time.")
+
+    ui.goodbye()
 
     return state
 
@@ -501,20 +512,59 @@ graph = graph_builder.compile()
 
 
 # ============================================================
+# PDF FILE PICKER
+# ============================================================
+
+def pick_pdf() -> str | None:
+    """Open a native Windows file dialog and return the chosen PDF path."""
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.withdraw()          # hide the blank tkinter root window
+    root.attributes("-topmost", True)  # bring the dialog to front
+
+    file_path = filedialog.askopenfilename(
+        title="Select a PDF to index",
+        filetypes=[("PDF files", "*.pdf")],
+    )
+
+    root.destroy()
+    return file_path or None  # empty string on cancel → None
+
+
+# ============================================================
 # ENTRY POINT
 # ============================================================
 
 if __name__ == "__main__":
-    print("\nHey alien 👽")
-    print("Let's run Sift.\n")
+    ui.banner()
+    ui.system("Initializing Sift...")
+
+    ui.info("Select a PDF to index:")
+    pdf_path = pick_pdf()
+
+    if pdf_path is None:
+        ui.warn("No file selected. Exiting.")
+        sys.exit(0)
+
+    if not os.path.isfile(pdf_path):
+        ui.error(f"File not found: {pdf_path}")
+        sys.exit(1)
+
+    if not pdf_path.lower().endswith(".pdf"):
+        ui.error(f"Not a PDF file: {pdf_path}")
+        sys.exit(1)
+
+    ui.ok(f"Selected: {pdf_path}")
 
     try:
-        graph.invoke({"doc_path": DOC_PATH})
+        graph.invoke({"doc_path": pdf_path})
 
     except KeyboardInterrupt:
-        print("\n\n⚠️ Interrupted.")
+        ui.warn("Interrupted.")
 
+    finally:
         if os.path.exists(QDRANT_PATH):
             shutil.rmtree(QDRANT_PATH, ignore_errors=True)
-
-            print(f"🧹 Removed {QDRANT_PATH} — Sift will start fresh next time.")
+            ui.ok(f"Removed {QDRANT_PATH} — Sift will start fresh next time.")

@@ -4,12 +4,14 @@ Sift Launcher
 Responsible for:
     1. Detecting NVIDIA GPU
     2. Choosing CPU/GPU
-    3. Installing the correct PyTorch build
+    3. Installing the correct PyTorch build (silently, with a spinner)
     4. Restarting Sift with the correct environment
 """
 
 import subprocess
 import sys
+import threading
+import time
 
 # ============================================================
 # CONFIG
@@ -18,6 +20,45 @@ import sys
 PYTORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 
 PYTORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu130"
+
+# ============================================================
+# ANSI — used here before Rich/main.py loads
+# ============================================================
+
+_G = "\033[92m"   # bright green
+_D = "\033[90m"   # dim grey
+_R = "\033[0m"    # reset
+_B = "\033[1m"    # bold
+
+_TAG_W = 7
+
+def _print(tag: str, msg: str) -> None:
+    sys.stdout.write(f"{_G}[[{tag:^{_TAG_W}}]]{_R}  {msg}\n")
+    sys.stdout.flush()
+
+def _ok(msg: str)     -> None: _print("OK",     msg)
+def _warn(msg: str)   -> None: _print("WARN",   msg)
+def _error(msg: str)  -> None: _print("ERROR",  msg)
+def _setup(msg: str)  -> None: _print("SETUP",  msg)
+def _gpu(msg: str)    -> None: _print("GPU",    msg)
+def _cpu(msg: str)    -> None: _print("CPU",    msg)
+
+_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+def _spin(label: str, thread: threading.Thread) -> None:
+    """Show a spinner in-place while `thread` is alive."""
+    i = 0
+    while thread.is_alive():
+        frame = _SPINNER[i % len(_SPINNER)]
+        sys.stdout.write(
+            f"\r{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  {frame}  {label}..."
+        )
+        sys.stdout.flush()
+        time.sleep(0.07)
+        i += 1
+    # clear the spinner line
+    sys.stdout.write(f"\r{' ' * 60}\r")
+    sys.stdout.flush()
 
 
 # ============================================================
@@ -107,32 +148,42 @@ print(torch.cuda.is_available())
 
 
 # ============================================================
-# INSTALL PYTORCH
+# INSTALL PYTORCH  (silent — all uv output suppressed)
 # ============================================================
 
 
 def install_pytorch(index_url):
 
-    print("\n📦 Installing PyTorch...")
+    result_holder = [None]
 
-    result = subprocess.run(
-        [
-            "uv",
-            "pip",
-            "install",
-            "torch",
-            "torchvision",
-            "--index-url",
-            index_url,
-            "--reinstall",
-        ],
-        check=False,
-    )
+    def _run():
+        result_holder[0] = subprocess.run(
+            [
+                "uv",
+                "pip",
+                "install",
+                "torch",
+                "torchvision",
+                "--index-url",
+                index_url,
+                "--reinstall",
+            ],
+            capture_output=True,   # ← suppresses all uv verbose output
+            check=False,
+        )
 
-    if result.returncode != 0:
-        print("\n❌ Failed to install PyTorch.")
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
 
+    _spin("Calibrating environment", thread)
+
+    thread.join()
+
+    if result_holder[0] is not None and result_holder[0].returncode != 0:
+        _error("PyTorch installation failed.")
         sys.exit(1)
+
+    _ok("Environment ready.")
 
 
 # ============================================================
@@ -141,7 +192,7 @@ def install_pytorch(index_url):
 
 
 def restart_sift(device):
-    print("\n🔄 Restarting Sift with the new PyTorch environment...\n")
+    _setup(f"Restarting Sift  [{device.upper()}]")
     result = subprocess.run(
         [sys.executable, "main.py", "--device", device],
         check=False,
@@ -158,25 +209,10 @@ def start_sift():
 
     import torch
 
-    # --------------------------------------------------------
-    # Verify PyTorch
-    # --------------------------------------------------------
-
-    print(f"PyTorch: {torch.__version__}")
-
     if torch.cuda.is_available():
-        print(f"🚀 Using GPU: {torch.cuda.get_device_name(0)}")
-
-        print(f"CUDA: {torch.version.cuda}")
-
+        _gpu(f"Device: {torch.cuda.get_device_name(0)}")
     else:
-        print("\n💻 Using CPU")
-
-    print("\n🚀 Starting Sift...")
-
-    # --------------------------------------------------------
-    # Run main.py
-    # --------------------------------------------------------
+        _cpu("Device: CPU")
 
     result = subprocess.run(
         [
@@ -212,15 +248,11 @@ def main():
     has_gpu, driver_cuda = check_nvidia_gpu()
 
     if has_gpu:
-        print("\n🚀 NVIDIA GPU detected!")
-
-        if driver_cuda:
-            print(f"Driver CUDA support: {driver_cuda}")
+        label = f"NVIDIA GPU detected  [CUDA {driver_cuda}]" if driver_cuda else "NVIDIA GPU detected"
+        _gpu(label)
 
     else:
-        print("\n💻 No NVIDIA GPU detected.")
-
-        print("Sift will use CPU.")
+        _cpu("No NVIDIA GPU detected — using CPU.")
 
         install_pytorch(PYTORCH_CPU_INDEX)
 
@@ -235,42 +267,38 @@ def main():
     pytorch = check_pytorch()
 
     if pytorch["installed"]:
-        print("\nCurrent PyTorch:")
-
-        print(f"    {pytorch['version']}")
+        _setup(f"PyTorch {pytorch['version']}")
 
     # ========================================================
     # ALREADY CUDA
     # ========================================================
 
     if pytorch["available"]:
-        print("\n🚀 CUDA-enabled PyTorch is already active.")
+        _ok("CUDA-enabled PyTorch active.")
 
         restart_sift("cuda")
 
         return
 
     # ========================================================
-    # GPU EXISTS BUT PYTORCH IS CPU
+    # GPU EXISTS BUT PYTORCH IS CPU-ONLY
     # ========================================================
 
-    print("\nCUDA-enabled PyTorch is not currently active.")
+    _warn("CUDA PyTorch not active.")
 
     while True:
-        print("\nHow do you want Sift to run?")
-
-        print("\n[1] CPU")
-
-        print("[2] GPU")
-
-        choice = input("\nChoose: ").strip()
+        sys.stdout.write(f"\n{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  Run Sift on  [1] CPU  [2] GPU : {_G}")
+        sys.stdout.flush()
+        choice = input().strip()
+        sys.stdout.write(f"\033[0m")
+        sys.stdout.flush()
 
         # ----------------------------------------------------
         # CPU
         # ----------------------------------------------------
 
         if choice == "1":
-            print("\n⚙️ Starting Sift with CPU...")
+            _setup("Starting with CPU...")
 
             install_pytorch(PYTORCH_CPU_INDEX)
 
@@ -283,7 +311,7 @@ def main():
         # ----------------------------------------------------
 
         if choice == "2":
-            print("\n⚙️ Starting Sift with GPU...")
+            _setup("Starting with GPU...")
 
             install_pytorch(PYTORCH_CUDA_INDEX)
 
@@ -291,7 +319,7 @@ def main():
 
             return
 
-        print("\n❌ Invalid choice.")
+        _error("Invalid choice — enter 1 or 2.")
 
 
 # ============================================================

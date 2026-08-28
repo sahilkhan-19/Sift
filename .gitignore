@@ -1,54 +1,110 @@
 # ============================================================
-# Python
+# Python & Bytecode
 # ============================================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+*.pyc
 
 # ============================================================
-# Virtual environments / uv
+# Virtual Environments & Tooling (uv, venv)
 # ============================================================
 .venv/
 venv/
+ENV/
 env/
+env.bak/
+venv.bak/
 .uv/
 
 # ============================================================
-# Sift project-specific
-# ============================================================
-qdrant_db/
-*.pdf
-cosmos.pdf
-
-# Hugging Face / model cache (if downloaded locally)
-.cache/
-models/
-
-# ============================================================
-# Build / packaging
+# Build & Packaging (PyInstaller, setuptools)
 # ============================================================
 build/
 dist/
 *.egg-info/
 .eggs/
+*.egg
+*.spec
+*.exe
+*.dll
+*.dylib
 
 # ============================================================
-# Environment / secrets
+# Local Vector-Store, Databases & Indexes
+# ============================================================
+qdrant_db/
+.qdrant/
+chroma/
+chroma_db/
+.chroma/
+faiss_index/
+*.db
+*.sqlite
+*.sqlite3
+*.ldb
+
+# ============================================================
+# Model Caches & ML Weights (Hugging Face, Torch)
+# ============================================================
+.cache/
+models/
+.hf_cache/
+.huggingface/
+.torch/
+
+# ============================================================
+# Local Documents & Generated Data
+# ============================================================
+*.pdf
+cosmos.pdf
+
+# ============================================================
+# Secrets & Environment Variables
 # ============================================================
 .env
 .env.*
+!.env.example
+!.env.template
+*.pem
+*.key
 
 # ============================================================
-# Editors / OS
+# Editors, IDEs & OS Files
 # ============================================================
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
 .DS_Store
+.DS_Store?
 Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
 
 # ============================================================
-# Logs
+# Logs & Temporary Files
 # ============================================================
 *.log
+logs/
+*.tmp
+*.temp
+.tmp/
+temp/
+
+# ============================================================
+# Testing & Code Quality Caches
+# ============================================================
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
