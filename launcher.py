@@ -11,6 +11,7 @@ _G = "\033[92m"
 _D = "\033[90m"
 _R = "\033[0m"
 _B = "\033[1m"
+_W = "\033[97m"
 
 _TAG_W = 7
 
@@ -242,7 +243,7 @@ def main():
 
     while True:
         sys.stdout.write(
-            f"\n{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  Run Sift on  [1] CPU  [2] GPU : {_G}"
+            f"\n{_G}[[{' SETUP ':^{_TAG_W}}]]{_R}  Run Sift on  [1] CPU  [2] GPU : {_W}"
         )
         sys.stdout.flush()
         choice = input().strip()
