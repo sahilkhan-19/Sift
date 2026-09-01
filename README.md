@@ -72,17 +72,6 @@ https://github.com/user-attachments/assets/b2d378a3-8900-4f54-b332-bcdfe113e98c
    - `4`: `llama3.2:1b` (Quick)
 6. **Chat:** Ask questions about your document! Type `exit`, `bye`, or `close` to cleanly shut down.
 
-## ⚙️ Configuration & Customization
-
-- **`NO_COLOR`**: Set the `NO_COLOR=1` environment variable to disable colorized terminal output.
-- **Building from source**: If you'd rather build the executable yourself:
-  ```powershell
-  git clone https://github.com/sahilkhan-19/Sift.git
-  cd Sift
-  uv sync
-  uv pip install pyinstaller
-  .\build_exe.bat
-  ```
 
 ## 📂 Project Structure
 
