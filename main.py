@@ -13,8 +13,11 @@ from langchain_ollama import ChatOllama
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import END, START, StateGraph
+from dotenv import load_dotenv
 
 import ui
+
+load_dotenv()
 
 QDRANT_PATH = "./qdrant_db"
 
