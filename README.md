@@ -31,36 +31,37 @@ Sift operates on a finite state machine powered by **LangGraph**, structuring th
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- **Python:** `3.12` or `3.13`
-- **Ollama:** Installed and running in the background. ([Download Ollama](https://ollama.com/))
-- **uv:** Astral's fast Python package manager.
-
-### 1. Install `uv` (Windows)
+### 1. Install `uv` and Ollama
 Open PowerShell and run:
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
+Then install [Ollama](https://ollama.com/) and make sure it's running in the background.
 
-### 2. Clone & Install
-```powershell
-git clone https://github.com/sahilkhan-19/Sift.git
-cd Sift
-uv sync
+### 2. Add your Hugging Face token
+Grab a free token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (Role: "Read" is enough), then paste it into the `.env` file:
 ```
-*`uv sync` will automatically create a `.venv` and install the base dependencies specified in `pyproject.toml`.*
+HF_TOKEN="paste_your_token_here"
+```
 
 ### 3. Run Sift
-Start Sift by running the launcher. It will handle checking for an NVIDIA GPU and installing the correct PyTorch wheels before launching the main application.
-
 ```powershell
-uv run launcher.py
+sift.exe
 ```
-*Alternatively, running `uv run sift_exe.py` will automatically sync dependencies on the first run before starting the launcher.*
+
+That's it — Sift takes care of GPU detection, PyTorch setup, and everything else from there.
+
+## 🎥 Demo
+
+<!-- Drop your tutorial .mp4 here via the GitHub web editor (drag-and-drop) to embed a playable demo -->
+
+
+https://github.com/user-attachments/assets/b2d378a3-8900-4f54-b332-bcdfe113e98c
+
 
 ## 📖 How to Use Sift
 
-1. **Launch:** Run the launcher command. Sift will configure PyTorch for your hardware.
+1. **Launch:** Run `sift.exe`. Sift will configure PyTorch for your hardware.
 2. **Select PDF:** A file dialog will pop up. Choose the PDF you want to query.
 3. **Language Setup:** Specify if your document is strictly in English to help Sift pick the best embedding model.
 4. **Wait for Indexing:** Sift will parse and index your document. You will see a progress bar for larger files.
@@ -73,10 +74,12 @@ uv run launcher.py
 
 ## ⚙️ Configuration & Customization
 
-Sift relies on internal variables rather than external `.env` files.
 - **`NO_COLOR`**: Set the `NO_COLOR=1` environment variable to disable colorized terminal output.
-- **Standalone Executable**: You can package Sift into a standalone `Sift.exe` binary.
+- **Building from source**: If you'd rather build the executable yourself:
   ```powershell
+  git clone https://github.com/sahilkhan-19/Sift.git
+  cd Sift
+  uv sync
   uv pip install pyinstaller
   .\build_exe.bat
   ```
